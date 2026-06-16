@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sirius Command Console</title>
     <link rel="stylesheet" href="./styles.css" />
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body>
     <main class="shell">
@@ -44,7 +45,39 @@
                 <span>↻</span>
               </button>
             </div>
+            <div class="calendar-connect">
+              <input id="googleClientId" type="text" placeholder="Google OAuth Client ID" autocomplete="off" />
+              <button id="connectCalendarBtn">Connect</button>
+            </div>
             <div class="timeline" id="timeline"></div>
+          </article>
+
+          <article class="panel voice-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Voice Core</p>
+                <h3>Hey Sirius</h3>
+              </div>
+              <span class="mode-chip" id="voiceStatus">Standby</span>
+            </div>
+            <div class="voice-meter" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <div class="voice-controls">
+              <button id="startListeningBtn">Start Listening</button>
+              <button id="stopListeningBtn" disabled>Stop</button>
+            </div>
+            <div class="voice-readout">
+              <p class="eyebrow">Transcript</p>
+              <p id="voiceTranscript">Say "hey sirius" to wake the assistant.</p>
+            </div>
+            <div class="voice-readout">
+              <p class="eyebrow">Command</p>
+              <p id="commandOutput">Waiting for wake word.</p>
+            </div>
           </article>
 
           <article class="panel">
