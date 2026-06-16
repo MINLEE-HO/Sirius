@@ -33,7 +33,7 @@ let tasks = [
 ];
 
 const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
-const WAKE_PATTERNS = ["hey sirius", "헤이 시리우스", "헤이 시리어스"];
+const WAKE_PATTERNS = ["hey siri", "헤이 시리", "hey sirius", "헤이 시리우스", "헤이 시리어스"];
 
 let accessToken = "";
 let tokenClient = null;
@@ -243,7 +243,7 @@ function createRecognition() {
     isListening = true;
     startListeningBtn.disabled = true;
     stopListeningBtn.disabled = false;
-    setVoiceState("Listening", 'Say "hey sirius" and then your command.');
+    setVoiceState("Listening", 'Say "hey siri" and then your command.');
   };
 
   nextRecognition.onresult = (event) => {
@@ -323,7 +323,7 @@ function handleSpeech(text) {
     return;
   }
 
-  setVoiceState("Listening", 'Wake word not detected. Say "hey sirius" first.');
+  setVoiceState("Listening", 'Wake word not detected. Say "hey siri" first.');
 }
 
 async function handleCommand(command) {
@@ -335,7 +335,7 @@ async function handleCommand(command) {
     return;
   }
 
-  const fallback = "명령을 이해하지 못했습니다. 예를 들어, hey sirius 오늘 일정 알려줘 라고 말해보세요.";
+  const fallback = "명령을 이해하지 못했습니다. 예를 들어, hey siri 오늘 일정 알려줘 라고 말해보세요.";
   setVoiceState("Listening", fallback);
   speak(fallback);
 }
@@ -506,4 +506,4 @@ renderTimeline();
 renderTasks();
 renderHealth();
 setAssistantMode("morning");
-setVoiceState("Standby", 'Say "hey sirius" to wake the assistant.');
+setVoiceState("Standby", 'Say "hey siri" to wake the assistant.');
