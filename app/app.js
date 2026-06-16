@@ -210,13 +210,45 @@ function summarizeEvents() {
   return `오늘은 총 ${events.length}개의 일정이 있습니다. 첫 일정은 ${first.time}, ${first.title}입니다. 주요 일정은 ${titles}${extra}입니다.`;
 }
 
+function getPreferredVoice() {
+  if (!("speechSynthesis" in window)) return null;
+
+  const voices = window.speechSynthesis.getVoices();
+  const preferredNames = [
+    "injoon",
+    "google uk english male",
+    "microsoft david",
+    "microsoft mark",
+    "alex",
+    "daniel",
+    "fred",
+    "thomas",
+  ];
+
+  return (
+    voices.find((voice) => preferredNames.some((name) => voice.name.toLowerCase().includes(name))) ||
+    voices.find((voice) => voice.lang.toLowerCase().startsWith("ko")) ||
+    voices.find((voice) => voice.lang.toLowerCase().startsWith("en")) ||
+    voices[0] ||
+    null
+  );
+}
+
 function speak(text) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "ko-KR";
-  utterance.rate = 0.95;
-  utterance.pitch = 0.92;
+  const voice = getPreferredVoice();
+
+  if (voice) {
+    utterance.voice = voice;
+    utterance.lang = voice.lang;
+  } else {
+    utterance.lang = "ko-KR";
+  }
+
+  utterance.rate = 0.88;
+  utterance.pitch = 0.62;
   window.speechSynthesis.speak(utterance);
 }
 
