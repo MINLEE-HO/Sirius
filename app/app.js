@@ -214,22 +214,12 @@ function getPreferredVoice() {
   if (!("speechSynthesis" in window)) return null;
 
   const voices = window.speechSynthesis.getVoices();
-  const preferredNames = [
-    "injoon",
-    "google uk english male",
-    "microsoft david",
-    "microsoft mark",
-    "alex",
-    "daniel",
-    "fred",
-    "thomas",
-  ];
+  const koreanVoices = voices.filter((voice) => voice.lang.toLowerCase().startsWith("ko"));
+  const koreanMaleNames = ["injoon", "injun", "민준", "준", "male"];
 
   return (
-    voices.find((voice) => preferredNames.some((name) => voice.name.toLowerCase().includes(name))) ||
-    voices.find((voice) => voice.lang.toLowerCase().startsWith("ko")) ||
-    voices.find((voice) => voice.lang.toLowerCase().startsWith("en")) ||
-    voices[0] ||
+    koreanVoices.find((voice) => koreanMaleNames.some((name) => voice.name.toLowerCase().includes(name))) ||
+    koreanVoices[0] ||
     null
   );
 }
@@ -242,11 +232,9 @@ function speak(text) {
 
   if (voice) {
     utterance.voice = voice;
-    utterance.lang = voice.lang;
-  } else {
-    utterance.lang = "ko-KR";
   }
 
+  utterance.lang = "ko-KR";
   utterance.rate = 0.88;
   utterance.pitch = 0.62;
   window.speechSynthesis.speak(utterance);
