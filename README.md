@@ -21,3 +21,26 @@ Sirius is a personal assistant project that reads calendar context and health si
 - [Integrations](docs/integrations.md)
 - [Architecture](docs/architecture.md)
 - [Roadmap](docs/roadmap.md)
+
+## Voice And Calendar
+
+The app includes a browser-based Voice Core:
+
+- Click `Start Listening` to keep the assistant listening.
+- Say `hey sirius` first, then give a command.
+- Example: `hey sirius 오늘 일정 알려줘`
+- If Google Calendar is not connected, Sirius will ask for a Google OAuth Client ID.
+- After Calendar authorization, Sirius fetches today's primary calendar events and reads a Korean TTS summary.
+
+Google Calendar requires a Web OAuth client configured in Google Cloud Console:
+
+- Enable the Google Calendar API.
+- Create an OAuth Client ID for a web application.
+- Add the local origin used to run this app, such as `http://localhost:4173`, to authorized JavaScript origins.
+- Paste the Client ID into the app's `Google OAuth Client ID` field and click `Connect`.
+
+Sirius requests only this read-only scope:
+
+```text
+https://www.googleapis.com/auth/calendar.readonly
+```

@@ -1,4 +1,4 @@
-const events = [
+const sampleEvents = [
   {
     time: "09:30",
     title: "Product scope review",
@@ -25,11 +25,21 @@ const events = [
   },
 ];
 
+let events = [...sampleEvents];
 let tasks = [
   { text: "Choose first app surface", type: "focus", done: false },
   { text: "Draft Google Calendar OAuth scope list", type: "prepare", done: false },
   { text: "Write deletion and export data principle", type: "quick", done: false },
 ];
+
+const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
+const WAKE_PATTERNS = ["hey sirius", "헤이 시리우스", "헤이 시리어스"];
+
+let accessToken = "";
+let tokenClient = null;
+let isListening = false;
+let awaitingCommand = false;
+let recognition = null;
 
 const todayLabel = document.querySelector("#todayLabel");
 const briefingHeadline = document.querySelector("#briefingHeadline");
@@ -47,15 +57,37 @@ const recoveryValue = document.querySelector("#recoveryValue");
 const loadValue = document.querySelector("#loadValue");
 const healthHint = document.querySelector("#healthHint");
 const assistantMessage = document.querySelector("#assistantMessage");
+const googleClientId = document.querySelector("#googleClientId");
+const connectCalendarBtn = document.querySelector("#connectCalendarBtn");
+const startListeningBtn = document.querySelector("#startListeningBtn");
+const stopListeningBtn = document.querySelector("#stopListeningBtn");
+const voiceStatus = document.querySelector("#voiceStatus");
+const voiceTranscript = document.querySelector("#voiceTranscript");
+const commandOutput = document.querySelector("#commandOutput");
+const voicePanel = document.querySelector(".voice-panel");
 
-const formatter = new Intl.DateTimeFormat("ko-KR", {
+const dateFormatter = new Intl.DateTimeFormat("ko-KR", {
   weekday: "long",
   month: "long",
   day: "numeric",
 });
 
+const timeFormatter = new Intl.DateTimeFormat("ko-KR", {
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 function renderDate() {
-  todayLabel.textContent = formatter.format(new Date());
+  todayLabel.textContent = dateFormatter.format(new Date());
 }
 
 function renderTimeline() {
@@ -63,11 +95,11 @@ function renderTimeline() {
     .map(
       (event) => `
         <section class="event">
-          <time>${event.time}</time>
+          <time>${escapeHtml(event.time)}</time>
           <div>
-            <strong>${event.title}</strong>
-            <p>${event.detail}</p>
-            <p><span class="tag">Prep</span> ${event.prep}</p>
+            <strong>${escapeHtml(event.title)}</strong>
+            <p>${escapeHtml(event.detail)}</p>
+            <p><span class="tag">Prep</span> ${escapeHtml(event.prep)}</p>
           </div>
         </section>
       `,
@@ -80,12 +112,12 @@ function renderTasks() {
     .map(
       (task, index) => `
         <li>
-          <input type="checkbox" ${task.done ? "checked" : ""} data-index="${index}" aria-label="Complete ${task.text}" />
+          <input type="checkbox" ${task.done ? "checked" : ""} data-index="${index}" aria-label="Complete ${escapeHtml(task.text)}" />
           <div>
-            <strong>${task.text}</strong>
-            <p>${getTaskDescription(task.type)}</p>
+            <strong>${escapeHtml(task.text)}</strong>
+            <p>${escapeHtml(getTaskDescription(task.type))}</p>
           </div>
-          <span class="tag">${task.type}</span>
+          <span class="tag">${escapeHtml(task.type)}</span>
         </li>
       `,
     )
@@ -167,6 +199,267 @@ function setAssistantMode(mode) {
   assistantMessage.innerHTML = `<strong>${message.title}</strong><p>${message.body}</p>`;
 }
 
+function summarizeEvents() {
+  if (!events.length) {
+    return "오늘 등록된 일정이 없습니다.";
+  }
+
+  const first = events[0];
+  const titles = events.slice(0, 3).map((event) => `${event.time} ${event.title}`).join(", ");
+  const extra = events.length > 3 ? ` 외 ${events.length - 3}건` : "";
+  return `오늘은 총 ${events.length}개의 일정이 있습니다. 첫 일정은 ${first.time}, ${first.title}입니다. 주요 일정은 ${titles}${extra}입니다.`;
+}
+
+function speak(text) {
+  if (!("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "ko-KR";
+  utterance.rate = 0.95;
+  utterance.pitch = 0.92;
+  window.speechSynthesis.speak(utterance);
+}
+
+function setVoiceState(status, message, isAwake = false) {
+  voiceStatus.textContent = status;
+  commandOutput.textContent = message;
+  voicePanel.classList.toggle("is-listening", isListening);
+  voicePanel.classList.toggle("is-awake", isAwake);
+}
+
+function createRecognition() {
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Recognition) {
+    setVoiceState("Unsupported", "이 브라우저는 Web Speech Recognition을 지원하지 않습니다. Chrome 계열 브라우저에서 실행해 주세요.");
+    return null;
+  }
+
+  const nextRecognition = new Recognition();
+  nextRecognition.continuous = true;
+  nextRecognition.interimResults = true;
+  nextRecognition.lang = "ko-KR";
+
+  nextRecognition.onstart = () => {
+    isListening = true;
+    startListeningBtn.disabled = true;
+    stopListeningBtn.disabled = false;
+    setVoiceState("Listening", 'Say "hey sirius" and then your command.');
+  };
+
+  nextRecognition.onresult = (event) => {
+    let interimText = "";
+    let finalText = "";
+
+    for (let index = event.resultIndex; index < event.results.length; index += 1) {
+      const transcript = event.results[index][0].transcript.trim();
+      if (event.results[index].isFinal) {
+        finalText += ` ${transcript}`;
+      } else {
+        interimText += ` ${transcript}`;
+      }
+    }
+
+    const heard = (finalText || interimText).trim();
+    if (heard) {
+      voiceTranscript.textContent = heard;
+    }
+
+    if (finalText.trim()) {
+      handleSpeech(finalText.trim());
+    }
+  };
+
+  nextRecognition.onerror = (event) => {
+    setVoiceState("Voice error", `음성 인식 오류: ${event.error}`);
+  };
+
+  nextRecognition.onend = () => {
+    if (isListening) {
+      nextRecognition.start();
+      return;
+    }
+
+    startListeningBtn.disabled = false;
+    stopListeningBtn.disabled = true;
+    setVoiceState("Standby", "Listening stopped.");
+  };
+
+  return nextRecognition;
+}
+
+function normalizeSpeech(text) {
+  return text.toLowerCase().replace(/[.,!?]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function findWakeCommand(text) {
+  const normalized = normalizeSpeech(text);
+
+  for (const wakePattern of WAKE_PATTERNS) {
+    const wakeIndex = normalized.indexOf(wakePattern);
+    if (wakeIndex >= 0) {
+      return normalized.slice(wakeIndex + wakePattern.length).trim();
+    }
+  }
+
+  return null;
+}
+
+function handleSpeech(text) {
+  const inlineCommand = findWakeCommand(text);
+
+  if (inlineCommand !== null) {
+    awaitingCommand = true;
+    setVoiceState("Awake", "네, 듣고 있습니다.", true);
+    speak("네, 듣고 있습니다.");
+
+    if (inlineCommand) {
+      handleCommand(inlineCommand);
+    }
+    return;
+  }
+
+  if (awaitingCommand) {
+    handleCommand(normalizeSpeech(text));
+    return;
+  }
+
+  setVoiceState("Listening", 'Wake word not detected. Say "hey sirius" first.');
+}
+
+async function handleCommand(command) {
+  awaitingCommand = false;
+  const wantsCalendar = command.includes("일정") || command.includes("캘린더") || command.includes("calendar") || command.includes("schedule");
+
+  if (wantsCalendar) {
+    await readCalendarCommand();
+    return;
+  }
+
+  const fallback = "명령을 이해하지 못했습니다. 예를 들어, hey sirius 오늘 일정 알려줘 라고 말해보세요.";
+  setVoiceState("Listening", fallback);
+  speak(fallback);
+}
+
+async function readCalendarCommand() {
+  if (!accessToken) {
+    const message = "Google Calendar가 아직 연결되지 않았습니다. Google OAuth Client ID를 입력하고 Connect를 눌러 주세요.";
+    setVoiceState("Needs calendar", message);
+    speak(message);
+    return;
+  }
+
+  try {
+    await fetchTodayEvents();
+    const summary = summarizeEvents();
+    setVoiceState("Calendar ready", summary);
+    setAssistantMessage("Calendar briefing", summary);
+    speak(summary);
+  } catch (error) {
+    const message = `Calendar 정보를 가져오지 못했습니다. ${error.message}`;
+    setVoiceState("Calendar error", message);
+    speak("Calendar 정보를 가져오지 못했습니다.");
+  }
+}
+
+function setAssistantMessage(title, body) {
+  assistantMessage.innerHTML = `<strong>${escapeHtml(title)}</strong><p>${escapeHtml(body)}</p>`;
+}
+
+function getTodayWindow() {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return { start, end };
+}
+
+function formatEventTime(eventDate) {
+  if (!eventDate.dateTime) return "All day";
+  return timeFormatter.format(new Date(eventDate.dateTime));
+}
+
+function normalizeCalendarEvent(item) {
+  const start = item.start ?? {};
+  const end = item.end ?? {};
+  const hasLocation = Boolean(item.location);
+  const hasMeet = Boolean(item.hangoutLink);
+  const attendees = Array.isArray(item.attendees) ? item.attendees.length : 0;
+
+  return {
+    time: formatEventTime(start),
+    title: item.summary || "Untitled event",
+    detail: hasLocation ? item.location : hasMeet ? item.hangoutLink : attendees ? `${attendees} attendees` : "No location or meeting link.",
+    prep: end.dateTime ? `Ends ${timeFormatter.format(new Date(end.dateTime))}` : "Review details before the event.",
+  };
+}
+
+async function fetchTodayEvents() {
+  const { start, end } = getTodayWindow();
+  const params = new URLSearchParams({
+    timeMin: start.toISOString(),
+    timeMax: end.toISOString(),
+    singleEvents: "true",
+    orderBy: "startTime",
+    maxResults: "10",
+  });
+
+  const response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params.toString()}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.status === 401) {
+    accessToken = "";
+    throw new Error("Access token expired. Connect를 다시 눌러 주세요.");
+  }
+
+  if (!response.ok) {
+    throw new Error(`Google Calendar API returned ${response.status}.`);
+  }
+
+  const data = await response.json();
+  events = (data.items ?? []).map(normalizeCalendarEvent);
+  renderTimeline();
+  renderBriefing();
+  return events;
+}
+
+function connectCalendar() {
+  const clientId = googleClientId.value.trim();
+  if (!clientId) {
+    const message = "Google OAuth Client ID를 먼저 입력해 주세요.";
+    setAssistantMessage("Calendar connection", message);
+    speak(message);
+    return;
+  }
+
+  if (!window.google?.accounts?.oauth2) {
+    const message = "Google Identity Services 스크립트를 아직 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
+    setAssistantMessage("Calendar connection", message);
+    return;
+  }
+
+  tokenClient = window.google.accounts.oauth2.initTokenClient({
+    client_id: clientId,
+    scope: CALENDAR_SCOPE,
+    callback: async (response) => {
+      if (response.error) {
+        setAssistantMessage("Calendar connection", `Google authorization failed: ${response.error}`);
+        return;
+      }
+
+      accessToken = response.access_token;
+      await fetchTodayEvents();
+      const summary = summarizeEvents();
+      setAssistantMessage("Calendar connected", summary);
+      speak(`Google Calendar가 연결되었습니다. ${summary}`);
+    },
+  });
+
+  tokenClient.requestAccessToken({ prompt: "consent" });
+}
+
 taskForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const text = taskInput.value.trim();
@@ -185,6 +478,21 @@ taskList.addEventListener("change", (event) => {
   renderBriefing();
 });
 
+startListeningBtn.addEventListener("click", () => {
+  recognition = recognition || createRecognition();
+  if (!recognition) return;
+  isListening = true;
+  recognition.start();
+});
+
+stopListeningBtn.addEventListener("click", () => {
+  isListening = false;
+  awaitingCommand = false;
+  recognition?.stop();
+  window.speechSynthesis?.cancel();
+});
+
+connectCalendarBtn.addEventListener("click", connectCalendar);
 document.querySelector("#addTaskBtn").addEventListener("click", () => taskInput.focus());
 document.querySelector("#optimizeBtn").addEventListener("click", () => setAssistantMode("focus"));
 document.querySelector("#morningBtn").addEventListener("click", () => setAssistantMode("morning"));
@@ -198,3 +506,4 @@ renderTimeline();
 renderTasks();
 renderHealth();
 setAssistantMode("morning");
+setVoiceState("Standby", 'Say "hey sirius" to wake the assistant.');
