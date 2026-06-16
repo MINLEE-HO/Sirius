@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sirius Command Console</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="briefing-panel" aria-label="Sirius daily briefing">
+        <header class="topbar">
+          <div>
+            <p class="kicker">SIRIUS LOCAL ASSISTANT</p>
+            <h1>Good morning, Commander.</h1>
+          </div>
+          <div class="system-status" aria-label="System status">
+            <span class="pulse"></span>
+            <span>Local-first mode</span>
+          </div>
+        </header>
+
+        <section class="orbital-core" aria-label="Daily readiness summary">
+          <div class="reactor" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <div class="briefing-copy">
+            <p class="timestamp" id="todayLabel"></p>
+            <h2 id="briefingHeadline">Analyzing your day.</h2>
+            <p id="briefingText"></p>
+          </div>
+        </section>
+
+        <section class="dashboard-grid">
+          <article class="panel schedule">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Calendar</p>
+                <h3>Today</h3>
+              </div>
+              <button class="icon-button" id="optimizeBtn" aria-label="Optimize plan" title="Optimize plan">
+                <span>↻</span>
+              </button>
+            </div>
+            <div class="timeline" id="timeline"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Tasks</p>
+                <h3>Next Actions</h3>
+              </div>
+              <button class="icon-button" id="addTaskBtn" aria-label="Add task" title="Add task">
+                <span>+</span>
+              </button>
+            </div>
+            <form class="task-form" id="taskForm">
+              <input id="taskInput" type="text" placeholder="Capture a task" autocomplete="off" />
+              <select id="taskWeight" aria-label="Task weight">
+                <option value="focus">Focus</option>
+                <option value="quick">Quick</option>
+                <option value="prepare">Prep</option>
+              </select>
+              <button class="submit-task" type="submit">Add</button>
+            </form>
+            <ul class="task-list" id="taskList"></ul>
+          </article>
+
+          <article class="panel health-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Health Context</p>
+                <h3>Energy Signals</h3>
+              </div>
+              <span class="privacy-chip">Permission-gated</span>
+            </div>
+            <div class="signal-list">
+              <label>
+                <span>Sleep</span>
+                <input id="sleepRange" type="range" min="3" max="10" value="6.5" step="0.5" />
+                <strong id="sleepValue">6.5h</strong>
+              </label>
+              <label>
+                <span>Recovery</span>
+                <input id="recoveryRange" type="range" min="1" max="10" value="6" step="1" />
+                <strong id="recoveryValue">6/10</strong>
+              </label>
+              <label>
+                <span>Load</span>
+                <input id="loadRange" type="range" min="1" max="10" value="7" step="1" />
+                <strong id="loadValue">7/10</strong>
+              </label>
+            </div>
+            <div class="recommendation" id="healthHint"></div>
+          </article>
+
+          <article class="panel assistant-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Assistant</p>
+                <h3>Recommendation</h3>
+              </div>
+              <span class="mode-chip">JARVIS-inspired</span>
+            </div>
+            <div class="assistant-message" id="assistantMessage"></div>
+            <div class="action-row">
+              <button id="morningBtn">Morning</button>
+              <button id="focusBtn">Focus</button>
+              <button id="wrapBtn">Wrap-up</button>
+            </div>
+          </article>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
