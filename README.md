@@ -31,7 +31,6 @@ The app includes a browser-based Voice Core:
 - Example: `hey siri 오늘 일정 알려줘`
 - If Google Calendar is not connected, Sirius will ask for a Google OAuth Client ID.
 - After Calendar authorization, Sirius fetches today's primary calendar events and reads a Korean TTS summary.
-- TTS prefers an available Korean male system/browser voice, keeps speech in Korean, and lowers pitch for a calmer assistant tone; it does not clone the original JARVIS voice.
 
 Google Calendar requires a Web OAuth client configured in Google Cloud Console:
 
